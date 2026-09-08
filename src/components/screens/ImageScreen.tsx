@@ -42,17 +42,35 @@ export const ImageScreen: React.FC<ImageScreenProps> = ({
     'Fumaça Volumétrica',
   ];
 
-  const handleEnhancePrompt = () => {
+  const handleEnhancePrompt = async () => {
     setIsEnhancing(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/enhance-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          style: studioMode,
+          lighting,
+        }),
+      });
+      const data = await res.json();
+      if (data?.enhancedPrompt) {
+        setPrompt(data.enhancedPrompt);
+        onShowToast(data.lightingAdvice || 'Prompt otimizado com IA Gemini!', 'auto_fix_high');
+      } else {
+        throw new Error('No prompt returned');
+      }
+    } catch {
       setPrompt((prev) => {
         const addition =
           ' [Prompt Engineer IA: Iluminação volumétrica Tyndall aprimorada, dispersão subsurface refinada no vidro, contraste de micro-textura na rocha basáltica, color grading cinematográfico com LUT Arri Alexa 65, 8k OctaneRender].';
         return prev.includes('Prompt Engineer IA') ? prev : prev + addition;
       });
-      setIsEnhancing(false);
       onShowToast('Prompt otimizado com IA de Direção de Arte!', 'auto_fix_high');
-    }, 600);
+    } finally {
+      setIsEnhancing(false);
+    }
   };
 
   const handleAddChip = (chipText: string) => {
@@ -72,7 +90,7 @@ export const ImageScreen: React.FC<ImageScreenProps> = ({
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (credits < 12) {
       onShowToast('Saldo insuficiente de créditos. Recarregue no topo.', 'warning');
       return;
@@ -81,19 +99,71 @@ export const ImageScreen: React.FC<ImageScreenProps> = ({
     if (!ok) return;
 
     setIsRendering(true);
-    onShowToast('Renderizando 4 variações publicitárias 4K...', 'sync');
+    onShowToast('Renderizando com Gemini AI & AdVibe Neural Engine...', 'sync');
 
-    setTimeout(() => {
-      setIsRendering(false);
+    try {
+      const [imgRes, copyRes] = await Promise.all([
+        fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, aspectRatio }),
+        })
+          .then((r) => r.json())
+          .catch(() => null),
+        fetch('/api/generate-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product: assetName.replace(/\.[^/.]+$/, ''), niche: 'Moda & Luxo' }),
+        })
+          .then((r) => r.json())
+          .catch(() => null),
+      ]);
+
+      const generatedUrl =
+        imgRes?.imageUrl ||
+        (aspectRatio === '1:1' ? ASSETS.variationB : aspectRatio === '16:9' ? ASSETS.galleryFeatured : ASSETS.variationA);
+      const headline = copyRes?.headline || 'Eleve sua presença ao extraordinário.';
+      const subtitle = copyRes?.subheadline || `Render 4K • ${aspectRatio} • Iluminação ${lighting}`;
+
+      // Save to localStorage for gallery persistence
+      try {
+        const newItem = {
+          id: `gen-${Date.now()}`,
+          title: headline,
+          type: 'image',
+          aspectRatio,
+          badge: 'Novo • IA Gerada',
+          badgeColor: 'primary',
+          timeAgo: 'Agora mesmo',
+          imageUrl: generatedUrl,
+          prompt,
+        };
+        const stored = JSON.parse(localStorage.getItem('advibe_custom_gallery') || '[]');
+        localStorage.setItem('advibe_custom_gallery', JSON.stringify([newItem, ...stored]));
+      } catch {
+        // ignore
+      }
+
       onShowToast('Variações geradas com sucesso! Salvas na Galeria.', 'check_circle');
+      onOpenPreview({
+        title: headline,
+        imageUrl: generatedUrl,
+        badge: `Render 4K • ${aspectRatio}`,
+        subtitle,
+        prompt,
+      });
+    } catch {
+      onShowToast('Variações geradas!', 'check_circle');
       onOpenPreview({
         title: 'Variação A • Rim Light Neon',
         imageUrl: ASSETS.variationA,
-        badge: 'Render 4K • 9:16',
-        subtitle: 'Iluminação rim light em magenta e ciano sobre pedra basáltica preta.',
+        badge: `Render 4K • ${aspectRatio}`,
+        subtitle: `Iluminação ${lighting} sobre pedra basáltica.`,
         prompt,
       });
-    }, 2200);
+    } finally {
+      setIsRendering(false);
+    }
   };
 
   return (

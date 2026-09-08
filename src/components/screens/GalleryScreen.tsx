@@ -15,9 +15,23 @@ export const GalleryScreen: React.FC<GalleryScreenProps> = ({
   const [activeFilter, setActiveFilter] = useState<'all' | 'video' | 'image' | 'favorites'>('all');
   const [selectedVariant, setSelectedVariant] = useState<'A' | 'B'>('A');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [customItems, setCustomItems] = useState<GalleryItem[]>([]);
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem('advibe_custom_gallery');
+      if (stored) {
+        setCustomItems(JSON.parse(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const allItems = [...customItems, ...GALLERY_ITEMS];
 
   // Filter items
-  const filteredItems = GALLERY_ITEMS.filter((item) => {
+  const filteredItems = allItems.filter((item) => {
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.badge.toLowerCase().includes(searchQuery.toLowerCase());

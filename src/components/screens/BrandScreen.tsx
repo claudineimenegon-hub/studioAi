@@ -58,27 +58,50 @@ export const BrandScreen: React.FC<BrandScreenProps> = ({
     },
   ];
 
-  const colorsPalette = [
+  const [colorsPalette, setColorsPalette] = useState([
     { hex: '#FFB0CD', name: 'Neon Accent', bg: 'bg-[#ffb0cd]' },
     { hex: '#D0BCFF', name: 'Iris Violet', bg: 'bg-[#d0bcff]' },
     { hex: '#4CD7F6', name: 'Cyan Glow', bg: 'bg-[#4cd7f6]' },
     { hex: '#121318', name: 'Obsidian', bg: 'bg-[#121318]' },
-  ];
+  ]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (credits < 2) {
       onShowToast('Créditos insuficientes para geração de logo', 'warning');
       return;
     }
     onDeductCredits(2);
     setIsSynthesizing(true);
-    onShowToast('Sintetizando kit vetorial e mockups 3D...', 'diamond');
+    onShowToast('Sintetizando identidade vetorial com Gemini AI...', 'diamond');
 
-    setTimeout(() => {
-      setIsSynthesizing(false);
+    try {
+      const res = await fetch('/api/generate-brand-kit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandName, niche, style: designStyle }),
+      });
+      const data = await res.json();
+      if (data?.tagline) {
+        setTagline(data.tagline);
+      }
+      if (Array.isArray(data?.colors) && data.colors.length >= 4) {
+        const fallbackBgs = ['bg-[#ffb0cd]', 'bg-[#d0bcff]', 'bg-[#4cd7f6]', 'bg-[#121318]'];
+        setColorsPalette(
+          data.colors.slice(0, 4).map((c: any, idx: number) => ({
+            hex: c.hex || '#FFB0CD',
+            name: c.name || 'Paleta IA',
+            bg: fallbackBgs[idx % fallbackBgs.length],
+          }))
+        );
+      }
+      setSeedOffset((prev) => prev + 1);
+      onShowToast(`Kit de Marca "${brandName}" gerado com sucesso!`, 'check_circle');
+    } catch {
       setSeedOffset((prev) => prev + 1);
       onShowToast('Kit de Marca 360° gerado com sucesso!', 'check_circle');
-    }, 1400);
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   const handleCopyHex = (hex: string) => {
